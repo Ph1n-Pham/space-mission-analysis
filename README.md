@@ -5,6 +5,6 @@ My Tableau visualization can be accessed through spacemission_viz.png file or th
 
 Techincal Time Series analysis contains 2 files: 
   - technical_analysis_paper.pdf is the research paper on the subject
-  - Space-mission.html has all the coding part of the project (in R)
+  - Space-mission.html/.Rmd has all the coding part of the project (in R)
 
 Data sources are the csv file. Credit goes to [Maven Data Playground](https://www.mavenanalytics.io/data-playground)
