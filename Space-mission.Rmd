@@ -1,0 +1,359 @@
+---
+title: "Space-mission"
+author: "Phineas Pham"
+date: '2022-10-16'
+output: html_document
+---
+
+```{r setup, include=FALSE, warning = F}
+knitr::opts_chunk$set(echo = TRUE)
+require(astsa) #Library for book
+require(xts)
+require(mosaic)
+require(dplyr)
+require(car)
+require(Stat2Data)
+require(dynlm)
+library(nlme)
+require(AER)
+library(forecast)
+require(mgcv)
+library(tseries) # need for Augmented Dickey-Fuller test
+require(lmtest) # need for Durbin Watson test
+require(fBasics) # need for normality tests of residuals
+require(leaps)
+require(urca) # need for ERS test of stationarity
+library(tidyverse)
+library(lubridate)
+library(readr)
+library(padr)
+```
+
+**Input data**
+
+```{r, warning = FALSE}
+space_missions <- read_csv("space_missions.csv")
+#View(space_missions)
+space_missions_data_dictionary <- read_csv("space_missions_data_dictionary.csv")
+#View(space_missions_data_dictionary)
+```
+
+
+**Data Wrangling**
+
+We create a new dataframe with 2 columns: 1 for months and the other for the number of space missions in that month.
+
+```{r}
+#group data by month and sum sales
+sp <- space_missions %>% 
+    group_by(Date) %>%
+    summarise(total_count=n(),
+            .groups = 'drop') %>% 
+    as.data.frame()
+
+```
+
+```{r}
+sp <- sp %>% 
+    group_by(month = lubridate::floor_date(Date, 'month')) %>%
+    summarize(sum = sum(total_count)) 
+
+new_data <- pad(sp) 
+new_data[is.na(new_data)] <- 0
+sp <- new_data
+
+```
+
+```{r}
+spSum = sp$'sum'
+#View(sp)
+summary(sp)
+times <- ts(spSum)
+plot.ts(times, ylab = 'Number of space missions')
+#tsplot(spSum, ylab = 'Number of space missions')
+
+```
+
+
+**Non Parametric Trend**
+
+Smooth to with frequency = 1
+```{r}
+SOI = ts(spSum, freq=1)
+tsplot(SOI, col=8, ylab = 'Number of space missions') # the time scale matters (not shown)
+lines(ksmooth(time(SOI), SOI, "normal", bandwidth=12), lwd=2, col=4)
+
+```
+
+Smooth with frequency = 4
+
+```{r}
+SOI = ts(spSum, freq=4)
+tsplot(SOI, col=8, ylab = 'Number of space missions') # the time scale matters (not shown)
+lines(ksmooth(time(SOI), SOI, "normal", bandwidth=12), lwd=2, col=4)
+```
+Smooth with frequency = 12
+
+```{r}
+SOI = ts(spSum, freq=12)
+tsplot(SOI, col=8, ylab = 'Number of space missions') # the time scale matters (not shown)
+lines(ksmooth(time(SOI), SOI, "normal", bandwidth=12), lwd=2, col=4)
+```
+
+
+```{r}
+#Lowess
+trend(spSum, lowess = TRUE, main='Space missions')
+
+```
+
+**Fitting SARIMA Model**
+
+Now we check the detrended and differenced time series to see which one is stationary
+
+```{r}
+
+par(mfrow=2:1) # plot transformed data
+tsplot(detrend(spSum), main="detrended" )
+tsplot(diff(spSum), main="differenced" )
+```
+
+Differenced time series looks stationary.
+
+
+```{r}
+tsplot(diff(sp$sum))
+
+adf.test(diff(sp$sum))
+pp.test(diff(sp$sum))
+kpss.test(diff(sp$sum))
+
+```
+```{r}
+summary(ur.ers(diff(sp$sum)))
+```
+
+After 4 tests, I am confident that the differenced time series is stationary.
+
+```{r, warning=FALSE}
+mod1 <- Arima(sp$sum, order = c(0,1,0))
+plot(mod1$residuals)
+acf(mod1$residuals)
+pacf(mod1$residuals)
+
+
+mod1
+```
+
+```{r, warning=FALSE}
+mod1 <- Arima(sp$sum, order = c(0,1,1), seasonal = list(order=c(2,1,2),period=12))
+plot(mod1$residuals)
+acf(mod1$residuals)
+pacf(mod1$residuals)
+
+adf.test(mod1$residuals)
+pp.test(mod1$residuals)
+kpss.test(mod1$residuals)
+summary(ur.ers(mod1$residuals))
+
+mod1
+```
+```{r, warning=FALSE}
+mod1 <- Arima(sp$sum, order = c(1,2,1), seasonal = list(order=c(2,1,2),period=12))
+plot(mod1$residuals)
+acf(mod1$residuals)
+pacf(mod1$residuals)
+
+adf.test(mod1$residuals)
+pp.test(mod1$residuals)
+kpss.test(mod1$residuals)
+summary(ur.ers(mod1$residuals))
+
+mod1
+```
+```{r, warning=FALSE}
+mod1 <- Arima(sp$sum, order = c(2,2,1), seasonal = list(order=c(2,2,2),period=12))
+plot(mod1$residuals)
+acf(mod1$residuals)
+pacf(mod1$residuals)
+
+adf.test(mod1$residuals)
+pp.test(mod1$residuals)
+kpss.test(mod1$residuals)
+summary(ur.ers(mod1$residuals))
+
+mod1
+```
+
+
+```{r}
+auto.arima(sp$sum)
+```
+```{r, warning=FALSE}
+mod1 <- Arima(sp$sum, order = c(1,1,2))
+plot(mod1$residuals)
+acf(mod1$residuals)
+pacf(mod1$residuals)
+
+adf.test(mod1$residuals)
+pp.test(mod1$residuals)
+kpss.test(mod1$residuals)
+summary(ur.ers(mod1$residuals))
+
+mod1
+```
+
+```{r, warning=FALSE}
+mod1 <- Arima(sp$sum, order = c(1,1,2), seasonal = list(order=c(0,1,2),period=12))
+plot(mod1$residuals)
+acf(mod1$residuals)
+pacf(mod1$residuals)
+
+adf.test(mod1$residuals)
+pp.test(mod1$residuals)
+kpss.test(mod1$residuals)
+summary(ur.ers(mod1$residuals))
+
+mod1
+```
+```{r, warning=FALSE}
+mod1 <- Arima(sp$sum, order = c(1,1,2), seasonal = list(order=c(0,0,2),period=12))
+plot(mod1$residuals)
+acf(mod1$residuals)
+pacf(mod1$residuals)
+
+adf.test(mod1$residuals)
+pp.test(mod1$residuals)
+kpss.test(mod1$residuals)
+summary(ur.ers(mod1$residuals))
+
+mod1
+```
+```{r, warning=FALSE}
+mod1 <- Arima(sp$sum, order = c(1,1,2), seasonal = list(order=c(2,0,0),period=12))
+plot(mod1$residuals)
+acf(mod1$residuals)
+pacf(mod1$residuals)
+
+adf.test(mod1$residuals)
+pp.test(mod1$residuals)
+kpss.test(mod1$residuals)
+summary(ur.ers(mod1$residuals))
+
+mod1
+```
+```{r, warning=FALSE}
+mod1 <- Arima(sp$sum, order = c(1,1,2), seasonal = list(order=c(1,0,1),period=12))
+tsplot(mod1$residuals)
+coeftest(mod1)
+acf(mod1$residuals)
+pacf(mod1$residuals)
+
+
+mod1
+```
+```{r}
+coeftest(Arima(sp$sum, order = c(1,1,2), seasonal = list(order=c(1,0,1),period=12), include.drift = FALSE))
+```
+My best model:
+
+```{r, warning=FALSE}
+mod1 <- Arima(sp$sum, order = c(0,1,2), seasonal = list(order=c(1,0,1),period=12))
+tsplot(mod1$residuals)
+coeftest(mod1)
+acf(mod1$residuals)
+pacf(mod1$residuals)
+
+mod1
+```
+```{r}
+#stationary tests for residuals
+adf.test(mod1$residuals)
+pp.test(mod1$residuals)
+kpss.test(mod1$residuals)
+summary(ur.ers(mod1$residuals))
+```
+
+
+Model utility tests:
+
+```{r}
+checkresiduals(mod1)
+tsdiag(mod1) # looks good
+mod1 = sarima(spSum,p=0,d=1,q=2,P=1,D=0,Q=1,S=12)
+
+densityplot(as.numeric(mod1$residuals)) # these look uniform
+
+summary(mod1)
+coeftest(mod1)
+```
+```{r}
+pred = forecast(mod1,h=60)
+pred 
+```
+Forecasting:
+
+```{r}
+forecastArea <- forecast(mod1$fitted, h = 60)
+plot(forecastArea,lwd=2,col="purple", main="Forecasts from ARIMA(0,1,2)(1,0,1)[12]", xlab="Time", ylab="Number of space missions") 
+legend("topleft", legend=c("Past", "Future"), col=c("Purple", "Blue"), lty=1:2, cex=0.8) 
+   
+```
+
+
+**Function of time**
+
+```{r,warning=F}
+sp$M = as.factor(month(sp$month))
+sp$Y = as.factor(year(sp$month))
+```
+
+```{r}
+modY=lm(spSum~sp$month, data=sp)
+summary(modY)
+
+ResidLinear=ts(modY$residuals)
+plot(ResidLinear,cex=1.5,cex.lab=1.5,cex.axis=1.5,lwd=2,col="darkblue",xlab="t",ylab="Residual",main="Residuals - Linear Fit")
+abline(0,0,col="red")
+points(sp$month,modY$residuals,pch=19,col="darkblue")
+```
+
+
+
+```{r}
+t = ts(sp$month)
+fit = lm(spSum~ t + I(t^2) + cos(t*(2*pi/12)) + sin(t*(2*pi/12)) , na.action=NULL)
+
+summary(fit)
+```
+
+
+
+
+```{r}
+t = ts(sp$month)
+fit = lm(sp$sum ~ I(t^2) + as.factor(sp$M)  , na.action=NULL)
+
+summary(fit)
+vif(fit)
+
+```
+
+```{r}
+t = ts(sp$month)
+fit = lm(sp$sum ~ as.factor(sp$M)  , na.action=NULL)
+
+summary(fit)
+
+
+```
+
+
+
+
+
+
+
+
+
+
