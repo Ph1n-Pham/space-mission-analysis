@@ -7,4 +7,6 @@ Techincal Time Series analysis contains 2 files:
   - technical_analysis_paper.pdf is the research paper on the subject
   - Space-mission.html/.Rmd has all the coding part of the project (in R)
 
-Data sources are the csv file. Credit goes to [Maven Data Playground](https://www.mavenanalytics.io/data-playground)
+Data sources are the csv file. 
+
+**Credit:** [Maven Data Playground](https://www.mavenanalytics.io/data-playground)
